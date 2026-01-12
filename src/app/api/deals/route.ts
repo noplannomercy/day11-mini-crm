@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { deals } from '@/lib/db/schema';
-import { dealSchema } from '@/lib/validations';
+import { dealSchema, dealStages, DealStage } from '@/lib/validations';
 import { desc, eq } from 'drizzle-orm';
 
 // GET /api/deals - List all deals
@@ -15,15 +15,15 @@ export async function GET(request: NextRequest) {
     let query = db.select().from(deals).orderBy(desc(deals.createdAt));
 
     // Filter by stage
-    if (stage) {
-      query = query.where(eq(deals.stage, stage as any)) as any;
+    if (stage && dealStages.includes(stage as DealStage)) {
+      query = query.where(eq(deals.stage, stage as DealStage)) as typeof query;
     }
 
     const offset = (page - 1) * limit;
     const [results, countResult] = await Promise.all([
       query.limit(limit).offset(offset),
-      stage
-        ? db.select().from(deals).where(eq(deals.stage, stage as any))
+      stage && dealStages.includes(stage as DealStage)
+        ? db.select().from(deals).where(eq(deals.stage, stage as DealStage))
         : db.select().from(deals),
     ]);
 
@@ -63,12 +63,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const insertData = {
+      ...result.data,
+      expectedCloseDate: result.data.expectedCloseDate && result.data.expectedCloseDate !== ''
+        ? new Date(result.data.expectedCloseDate)
+        : null,
+      contactId: result.data.contactId && result.data.contactId !== '' ? result.data.contactId : null,
+      companyId: result.data.companyId && result.data.companyId !== '' ? result.data.companyId : null,
+      updatedAt: new Date(),
+    };
+
     const [deal] = await db
       .insert(deals)
-      .values({
-        ...result.data,
-        updatedAt: new Date(),
-      })
+      .values(insertData)
       .returning();
 
     return NextResponse.json(deal, { status: 201 });

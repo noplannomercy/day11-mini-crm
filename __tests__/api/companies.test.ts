@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { db } from '@/lib/db';
 import { companies, contacts, activities, tasks } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';

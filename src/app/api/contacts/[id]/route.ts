@@ -38,8 +38,8 @@ export async function GET(
   }
 }
 
-// PUT /api/contacts/:id - Update contact
-export async function PUT(
+// PATCH /api/contacts/:id - Update contact
+export async function PATCH(
   request: NextRequest,
   context: RouteContext
 ) {
@@ -56,12 +56,15 @@ export async function PUT(
       );
     }
 
+    const updateData = {
+      ...result.data,
+      companyId: result.data.companyId && result.data.companyId !== '' ? result.data.companyId : null,
+      updatedAt: new Date(),
+    };
+
     const [contact] = await db
       .update(contacts)
-      .set({
-        ...result.data,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(eq(contacts.id, id))
       .returning();
 

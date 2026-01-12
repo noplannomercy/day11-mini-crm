@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { companies } from '@/lib/db/schema';
 import { companySchema } from '@/lib/validations';
-import { desc, gt } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 
 // GET /api/companies - List all companies with pagination
 export async function GET(request: NextRequest) {

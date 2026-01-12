@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { deals } from '@/lib/db/schema';
 import { dealStages } from '@/lib/validations';
 
 // GET /api/deals/summary - Get stage summary with counts and totals
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get all deals
     const allDeals = await db.select().from(deals);

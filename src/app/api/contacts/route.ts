@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by company
     if (companyId) {
-      query = query.where(eq(contacts.companyId, companyId)) as any;
+      query = query.where(eq(contacts.companyId, companyId)) as typeof query;
     }
 
     const offset = (page - 1) * limit;
@@ -63,12 +63,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const insertData = {
+      ...result.data,
+      companyId: result.data.companyId && result.data.companyId !== '' ? result.data.companyId : null,
+      updatedAt: new Date(),
+    };
+
     const [contact] = await db
       .insert(contacts)
-      .values({
-        ...result.data,
-        updatedAt: new Date(),
-      })
+      .values(insertData)
       .returning();
 
     return NextResponse.json(contact, { status: 201 });

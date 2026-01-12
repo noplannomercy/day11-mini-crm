@@ -3,18 +3,25 @@
 import { useState } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent, closestCenter, DragOverlay } from '@dnd-kit/core';
 import { Deal } from '@/lib/db/schema';
+import { DealStage } from '@/lib/validations';
 import { PIPELINE_STAGES } from '@/lib/constants';
 import { PipelineColumn } from './pipeline-column';
 import { DealCard } from './deal-card';
+import { DealDialog } from './deal-dialog';
+import { Button } from '@/components/ui/button';
 
 interface PipelineBoardProps {
   initialDeals: Deal[];
+  contacts: { id: string; name: string }[];
+  companies: { id: string; name: string }[];
 }
 
-export function PipelineBoard({ initialDeals }: PipelineBoardProps) {
+export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoardProps) {
   const [deals, setDeals] = useState<Deal[]>(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
 
   // Group deals by stage
   const dealsByStage = PIPELINE_STAGES.reduce((acc, stage) => {
@@ -54,7 +61,7 @@ export function PipelineBoard({ initialDeals }: PipelineBoardProps) {
 
     // Optimistic update
     setDeals(prev =>
-      prev.map(d => d.id === dealId ? { ...d, stage: newStage as any } : d)
+      prev.map(d => d.id === dealId ? { ...d, stage: newStage as DealStage } : d)
     );
 
     try {
@@ -94,28 +101,65 @@ export function PipelineBoard({ initialDeals }: PipelineBoardProps) {
     }
   };
 
+  const handleSaveDeal = (savedDeal: Deal) => {
+    if (selectedDeal) {
+      // Update existing deal
+      setDeals(prev => prev.map(d => d.id === savedDeal.id ? savedDeal : d));
+    } else {
+      // Add new deal
+      setDeals(prev => [savedDeal, ...prev]);
+    }
+    setDialogOpen(false);
+    setSelectedDeal(null);
+  };
+
+  const handleNewDeal = () => {
+    setSelectedDeal(null);
+    setDialogOpen(true);
+  };
+
   return (
-    <DndContext
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      collisionDetection={closestCenter}
-    >
-      <div data-testid="pipeline-board" className="flex gap-4 overflow-x-auto p-4">
-        {PIPELINE_STAGES.map(stage => (
-          <PipelineColumn
-            key={stage.id}
-            stage={stage}
-            deals={dealsByStage[stage.id] || []}
-            disabled={isDragging}
-          />
-        ))}
+    <>
+      <div className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            거래 파이프라인
+          </h1>
+          <Button onClick={handleNewDeal}>새 거래</Button>
+        </div>
       </div>
 
-      <DragOverlay>
-        {activeDeal ? (
-          <DealCard deal={activeDeal} isDragging />
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+      <DndContext
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        collisionDetection={closestCenter}
+      >
+        <div data-testid="pipeline-board" className="flex gap-4 overflow-x-auto p-4">
+          {PIPELINE_STAGES.map(stage => (
+            <PipelineColumn
+              key={stage.id}
+              stage={stage}
+              deals={dealsByStage[stage.id] || []}
+              disabled={isDragging}
+            />
+          ))}
+        </div>
+
+        <DragOverlay>
+          {activeDeal ? (
+            <DealCard deal={activeDeal} isDragging />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <DealDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        deal={selectedDeal}
+        onSave={handleSaveDeal}
+        contacts={contacts}
+        companies={companies}
+      />
+    </>
   );
 }

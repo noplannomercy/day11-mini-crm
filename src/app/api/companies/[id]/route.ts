@@ -38,8 +38,8 @@ export async function GET(
   }
 }
 
-// PUT /api/companies/:id - Update company
-export async function PUT(
+// PATCH /api/companies/:id - Update company
+export async function PATCH(
   request: NextRequest,
   context: RouteContext
 ) {

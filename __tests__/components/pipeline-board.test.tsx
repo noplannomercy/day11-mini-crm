@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
 
 // Mock data
 const mockDeals = [
@@ -43,13 +42,18 @@ const mockDeals = [
 ];
 
 // Mock PipelineBoard component (will be implemented later)
-const PipelineBoard = ({ deals, onStageChange }: any) => {
+interface PipelineBoardProps {
+  deals: Array<{ id: string; title: string; amount: number; stage: string }>;
+  onStageChange?: (dealId: string, newStage: string) => void;
+}
+
+const PipelineBoard = ({ deals }: PipelineBoardProps) => {
   const stages = ['lead', 'qualified', 'proposal', 'negotiation', 'closed_won', 'closed_lost'];
 
   const dealsByStage = stages.reduce((acc, stage) => {
-    acc[stage] = deals.filter((d: any) => d.stage === stage);
+    acc[stage] = deals.filter((d) => d.stage === stage);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, typeof deals>);
 
   const getStageTotals = (stage: string) => {
     const stageDeals = dealsByStage[stage] || [];

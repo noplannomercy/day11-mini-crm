@@ -3,7 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock CompanyForm component (will be implemented later)
-const CompanyForm = ({ onSubmit, initialData }: any) => {
+interface CompanyFormProps {
+  onSubmit: (data: Record<string, string | number | undefined>) => void;
+  initialData?: Record<string, string | number | undefined>;
+}
+
+const CompanyForm = ({ onSubmit, initialData }: CompanyFormProps) => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);

@@ -67,13 +67,20 @@ export async function PUT(
     }
 
     // Update deal and create activity if stage changed
+    const updateData = {
+      ...result.data,
+      expectedCloseDate: result.data.expectedCloseDate && result.data.expectedCloseDate !== ''
+        ? new Date(result.data.expectedCloseDate)
+        : null,
+      contactId: result.data.contactId && result.data.contactId !== '' ? result.data.contactId : null,
+      companyId: result.data.companyId && result.data.companyId !== '' ? result.data.companyId : null,
+      updatedAt: new Date(),
+    };
+
     const [updatedDeal] = await db.transaction(async (tx) => {
       const [deal] = await tx
         .update(deals)
-        .set({
-          ...result.data,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(deals.id, id))
         .returning();
 
@@ -97,6 +104,14 @@ export async function PUT(
       { status: 500 }
     );
   }
+}
+
+// PATCH /api/deals/:id - Partially update deal
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext
+) {
+  return PUT(request, context);
 }
 
 // DELETE /api/deals/:id - Delete deal

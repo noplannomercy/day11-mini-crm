@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { deals, activities } from '@/lib/db/schema';
 import { dealStageUpdateSchema } from '@/lib/validations';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
