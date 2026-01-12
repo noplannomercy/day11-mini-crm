@@ -96,7 +96,7 @@ erDiagram
     deals {
         uuid id PK "DEFAULT gen_random_uuid()"
         varchar_200 title "NOT NULL"
-        integer amount "NOT NULL DEFAULT 0"
+        bigint amount "NOT NULL DEFAULT 0"
         deal_stage stage "NOT NULL DEFAULT 'lead'"
         date expected_close_date "NULL"
         uuid contact_id FK "NULL → contacts.id"
@@ -113,10 +113,11 @@ erDiagram
         text description "NULL"
         timestamp scheduled_at "NULL"
         timestamp completed_at "NULL"
-        uuid contact_id FK "NULL → contacts.id"
-        uuid company_id FK "NULL → companies.id"
-        uuid deal_id FK "NULL → deals.id"
+        uuid contact_id FK "NULL → contacts.id CHECK"
+        uuid company_id FK "NULL → companies.id CHECK"
+        uuid deal_id FK "NULL → deals.id CHECK"
         timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW()"
     }
 
     tasks {
@@ -130,6 +131,7 @@ erDiagram
         uuid company_id FK "NULL → companies.id"
         uuid deal_id FK "NULL → deals.id"
         timestamp created_at "DEFAULT NOW()"
+        timestamp updated_at "DEFAULT NOW()"
     }
 
     tags {
@@ -235,7 +237,7 @@ export const contacts = pgTable('contacts', {
 CREATE TABLE deals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(200) NOT NULL,
-  amount INTEGER NOT NULL DEFAULT 0,
+  amount BIGINT NOT NULL DEFAULT 0,  -- BIGINT for large deal amounts
   stage deal_stage NOT NULL DEFAULT 'lead',
   expected_close_date DATE,
   contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
@@ -255,7 +257,7 @@ export const dealStageEnum = pgEnum('deal_stage', [
 export const deals = pgTable('deals', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: varchar('title', { length: 200 }).notNull(),
-  amount: integer('amount').notNull().default(0),
+  amount: bigint('amount', { mode: 'number' }).notNull().default(0), // BIGINT for large amounts
   stage: dealStageEnum('stage').notNull().default('lead'),
   expectedCloseDate: date('expected_close_date'),
   contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
@@ -279,7 +281,12 @@ CREATE TABLE activities (
   contact_id UUID REFERENCES contacts(id) ON DELETE CASCADE,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  -- At least one parent must be linked
+  CONSTRAINT chk_activity_has_parent CHECK (
+    contact_id IS NOT NULL OR company_id IS NOT NULL OR deal_id IS NOT NULL
+  )
 );
 ```
 
@@ -298,7 +305,9 @@ export const activities = pgTable('activities', {
   companyId: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   dealId: uuid('deal_id').references(() => deals.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
+// Note: Add CHECK constraint via migration for at least one parent FK
 ```
 
 ### 3.5 tasks
@@ -314,7 +323,8 @@ CREATE TABLE tasks (
   contact_id UUID REFERENCES contacts(id) ON DELETE CASCADE,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
   deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -333,6 +343,7 @@ export const tasks = pgTable('tasks', {
   companyId: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   dealId: uuid('deal_id').references(() => deals.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 ```
 
@@ -522,7 +533,8 @@ flowchart TB
 ### 5.2 Unique Indexes
 
 ```sql
-CREATE UNIQUE INDEX idx_tags_name ON tags(name);
+-- Case-insensitive unique tag names
+CREATE UNIQUE INDEX idx_tags_name_lower ON tags(LOWER(name));
 ```
 
 ### 5.3 Foreign Key Indexes
@@ -578,6 +590,26 @@ CREATE INDEX idx_contacts_created_at ON contacts(created_at DESC);
 CREATE INDEX idx_companies_created_at ON companies(created_at DESC);
 CREATE INDEX idx_deals_created_at ON deals(created_at DESC);
 CREATE INDEX idx_activities_created_at ON activities(created_at DESC);
+
+-- updatedAt 인덱스 (동시성 제어용)
+CREATE INDEX idx_deals_updated_at ON deals(updated_at);
+CREATE INDEX idx_activities_updated_at ON activities(updated_at);
+CREATE INDEX idx_tasks_updated_at ON tasks(updated_at);
+```
+
+### 5.5 Full-Text Search Indexes (pg_trgm)
+
+```sql
+-- PostgreSQL pg_trgm 확장 활성화
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- 검색 성능 최적화를 위한 GIN 인덱스
+CREATE INDEX idx_contacts_name_trgm ON contacts USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_companies_name_trgm ON companies USING GIN (name gin_trgm_ops);
+CREATE INDEX idx_deals_title_trgm ON deals USING GIN (title gin_trgm_ops);
+
+-- 이메일 검색용
+CREATE INDEX idx_contacts_email_trgm ON contacts USING GIN (email gin_trgm_ops);
 ```
 
 ### 5.5 Index Summary Diagram
@@ -926,6 +958,95 @@ const searchResults = await Promise.all([
     .where(ilike(deals.title, `%${query}%`))
     .limit(5),
 ]);
+```
+
+### 7.8 Pagination Queries
+
+```typescript
+// Cursor-based pagination (권장)
+const contacts = await db
+  .select()
+  .from(contacts)
+  .where(cursor ? gt(contacts.id, cursor) : undefined)
+  .orderBy(contacts.createdAt)
+  .limit(20);
+
+// Offset-based pagination
+const contacts = await db
+  .select()
+  .from(contacts)
+  .orderBy(desc(contacts.createdAt))
+  .limit(pageSize)
+  .offset((page - 1) * pageSize);
+
+// Total count for pagination
+const [{ count }] = await db
+  .select({ count: sql<number>`COUNT(*)` })
+  .from(contacts);
+```
+
+### 7.9 Delete Preview Query
+
+```typescript
+// 삭제 전 영향도 확인 API
+async function getDeletePreview(companyId: string) {
+  const [contacts, deals, activities, tasks, tags] = await Promise.all([
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(contactsTable)
+      .where(eq(contactsTable.companyId, companyId)),
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(dealsTable)
+      .where(eq(dealsTable.companyId, companyId)),
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(activitiesTable)
+      .where(eq(activitiesTable.companyId, companyId)),
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(tasksTable)
+      .where(eq(tasksTable.companyId, companyId)),
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(companyTags)
+      .where(eq(companyTags.companyId, companyId)),
+  ]);
+
+  return {
+    contacts: contacts[0].count,      // SET NULL 처리
+    deals: deals[0].count,            // SET NULL 처리
+    activities: activities[0].count,  // CASCADE 삭제
+    tasks: tasks[0].count,            // CASCADE 삭제
+    tags: tags[0].count,              // 연결 해제
+  };
+}
+```
+
+### 7.10 Optimistic Locking Query
+
+```typescript
+// 동시성 제어를 위한 낙관적 락
+async function updateDealWithLock(
+  dealId: string,
+  newStage: DealStage,
+  originalUpdatedAt: Date
+) {
+  const result = await db
+    .update(deals)
+    .set({
+      stage: newStage,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(deals.id, dealId),
+        eq(deals.updatedAt, originalUpdatedAt) // 낙관적 락
+      )
+    )
+    .returning();
+
+  if (result.length === 0) {
+    throw new ConflictError('Deal was modified by another user');
+  }
+
+  return result[0];
+}
 ```
 
 ---

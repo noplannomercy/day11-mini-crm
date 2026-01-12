@@ -153,7 +153,7 @@ interface Contact {
 interface Deal {
   id: string
   title: string
-  amount: number
+  amount: bigint              // BIGINT - 대형 거래 금액 지원
   stage: 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost'
   expectedCloseDate: Date | null
   contactId: string | null
@@ -173,10 +173,11 @@ interface Activity {
   description: string | null
   scheduledAt: Date | null
   completedAt: Date | null
-  contactId: string | null
-  companyId: string | null
-  dealId: string | null
+  contactId: string | null    // 최소 1개 FK 필수 (CHECK 제약)
+  companyId: string | null    // 최소 1개 FK 필수 (CHECK 제약)
+  dealId: string | null       // 최소 1개 FK 필수 (CHECK 제약)
   createdAt: Date
+  updatedAt: Date             // 수정 추적용 추가
 }
 ```
 
@@ -193,6 +194,7 @@ interface Task {
   companyId: string | null
   dealId: string | null
   createdAt: Date
+  updatedAt: Date             // 수정 추적용 추가
 }
 ```
 
@@ -271,7 +273,7 @@ export const dealStageEnum = pgEnum('deal_stage', [
 export const deals = pgTable('deals', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: varchar('title', { length: 200 }).notNull(),
-  amount: integer('amount').notNull().default(0),
+  amount: bigint('amount', { mode: 'number' }).notNull().default(0), // BIGINT for large amounts
   stage: dealStageEnum('stage').notNull().default('lead'),
   expectedCloseDate: date('expected_close_date'),
   contactId: uuid('contact_id').references(() => contacts.id, { onDelete: 'set null' }),
@@ -295,7 +297,9 @@ export const activities = pgTable('activities', {
   companyId: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   dealId: uuid('deal_id').references(() => deals.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
+// CHECK: contact_id IS NOT NULL OR company_id IS NOT NULL OR deal_id IS NOT NULL
 
 // tasks 테이블
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high'])
@@ -311,6 +315,7 @@ export const tasks = pgTable('tasks', {
   companyId: uuid('company_id').references(() => companies.id, { onDelete: 'cascade' }),
   dealId: uuid('deal_id').references(() => deals.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
 
 // tags 테이블

@@ -378,18 +378,68 @@ sequenceDiagram
     DK-->>B: {active, over}
 
     B->>B: Calculate new stage
+
+    alt Moving from closed stage
+        B->>U: Show confirmation dialog
+        U->>B: Confirm or cancel
+    end
+
     B->>B: Optimistic update
     B-->>U: Show moved card
 
     B->>A: PUT /api/deals/:id
-    A->>DB: UPDATE deals SET stage
-    DB-->>A: Updated
-    A-->>B: Confirm
+    Note over A: Include updatedAt for optimistic lock
+    A->>DB: UPDATE deals SET stage WHERE updatedAt = original
 
-    alt Update failed
+    alt Concurrent modification detected
+        DB-->>A: 0 rows affected
+        A-->>B: 409 Conflict
         B->>B: Rollback state
-        B-->>U: Show error
+        B->>B: Fetch latest data
+        B-->>U: Show conflict error
+    else Update success
+        DB-->>A: Updated row
+        A-->>B: 200 OK + new updatedAt
+        B->>B: Update local updatedAt
     end
+
+    alt Network error
+        B->>B: Rollback state
+        B-->>U: Show error toast
+    end
+```
+
+### 4.3 Concurrency Control Pattern
+
+```typescript
+// Client-side: Include updatedAt in requests
+interface DealUpdateRequest {
+  stage: DealStage;
+  updatedAt: string; // ISO timestamp from last fetch
+}
+
+// Server-side: Optimistic locking
+async function updateDealStage(id: string, body: DealUpdateRequest) {
+  const result = await db.update(deals)
+    .set({
+      stage: body.stage,
+      updatedAt: new Date()
+    })
+    .where(and(
+      eq(deals.id, id),
+      eq(deals.updatedAt, new Date(body.updatedAt))
+    ))
+    .returning();
+
+  if (result.length === 0) {
+    return Response.json(
+      { error: 'Deal was modified by another user. Please refresh.' },
+      { status: 409 }
+    );
+  }
+
+  return Response.json(result[0]);
+}
 ```
 
 ---
@@ -563,15 +613,18 @@ Pipeline Stages (Fixed):
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/contacts` | GET | 연락처 목록 (필터/정렬) |
+| `/api/contacts` | GET | 연락처 목록 (필터/정렬/페이지네이션) |
 | `/api/contacts` | POST | 연락처 생성 |
 | `/api/contacts/:id` | GET | 연락처 상세 |
 | `/api/contacts/:id` | PUT | 연락처 수정 |
 | `/api/contacts/:id` | DELETE | 연락처 삭제 |
+| `/api/contacts/:id/delete-preview` | GET | 삭제 영향도 미리보기 |
 | `/api/companies` | GET/POST | 회사 목록/생성 |
 | `/api/companies/:id` | GET/PUT/DELETE | 회사 CRUD |
+| `/api/companies/:id/delete-preview` | GET | 삭제 영향도 미리보기 |
 | `/api/deals` | GET/POST | 거래 목록/생성 |
 | `/api/deals/:id` | GET/PUT/DELETE | 거래 CRUD |
+| `/api/deals/:id/delete-preview` | GET | 삭제 영향도 미리보기 |
 | `/api/activities` | GET/POST | 활동 목록/생성 |
 | `/api/tasks` | GET/POST | 태스크 목록/생성 |
 | `/api/tags` | GET/POST | 태그 목록/생성 |
@@ -579,15 +632,67 @@ Pipeline Stages (Fixed):
 | `/api/search` | GET | 전역 검색 |
 | `/api/stats` | GET | 대시보드 통계 |
 
+### 6.4.1 Pagination Query Parameters
+
+```typescript
+// GET /api/contacts?page=1&limit=20&sort=createdAt&order=desc
+interface PaginationParams {
+  page?: number;        // default: 1
+  limit?: number;       // default: 20, max: 100
+  sort?: string;        // 정렬 필드
+  order?: 'asc' | 'desc';
+  cursor?: string;      // cursor-based pagination
+}
+
+// Response format
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+    nextCursor?: string;
+  };
+}
+```
+
+### 6.4.2 Delete Preview Response
+
+```typescript
+// GET /api/companies/:id/delete-preview
+interface DeletePreview {
+  entityType: 'company' | 'contact' | 'deal';
+  entityName: string;
+  impact: {
+    setNull: {
+      contacts?: number;  // 회사 연결 해제
+      deals?: number;     // 연락처/회사 연결 해제
+    };
+    cascade: {
+      activities: number; // 삭제될 활동
+      tasks: number;      // 삭제될 태스크
+    };
+    unlink: {
+      tags: number;       // 태그 연결 해제
+    };
+  };
+  warning?: string;
+}
+```
+
 ### 6.5 Performance Considerations
 
 | Area | Strategy |
 |------|----------|
-| **Database** | 인덱스: company_id, contact_id, deal_id, stage, created_at |
+| **Database** | 인덱스: company_id, contact_id, deal_id, stage, created_at, updated_at |
 | **Caching** | React Query 캐싱, Next.js ISR |
-| **Pagination** | 목록 API 커서 기반 페이지네이션 |
-| **DnD** | Optimistic update로 즉각적 UI 반응 |
-| **Search** | Debounce (300ms), 인덱스 기반 검색 |
+| **Pagination** | Cursor 기반 (대량 데이터) 또는 Offset 기반 (소량 데이터) |
+| **DnD** | Optimistic update + 낙관적 락 (updatedAt 기반) |
+| **Search** | Debounce (300ms), pg_trgm GIN 인덱스 |
+| **Batch Delete** | 대량 CASCADE 시 비동기 처리 고려 |
 
 ### 6.6 Security Considerations
 
