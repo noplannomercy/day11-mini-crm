@@ -7,7 +7,11 @@ import { z } from 'zod';
 export const companySchema = z.object({
   name: z.string().min(1, '회사명은 필수입니다'),
   industry: z.string().optional().nullable(),
-  website: z.string().url('올바른 URL 형식이 아닙니다').optional().or(z.literal('')).nullable(),
+  website: z.union([
+    z.string().url('올바른 URL 형식이 아닙니다'),
+    z.literal(''),
+    z.null(),
+  ]).optional(),
   address: z.string().optional().nullable(),
   employeeCount: z.number().int().positive('양수만 입력 가능합니다').optional().nullable(),
   memo: z.string().optional().nullable(),
@@ -21,20 +25,18 @@ export type CompanyInput = z.infer<typeof companySchema>;
 
 export const contactSchema = z.object({
   name: z.string().min(1, '이름은 필수입니다'),
-  email: z
-    .string()
-    .email('올바른 이메일 형식이 아닙니다')
-    .optional()
-    .or(z.literal(''))
-    .nullable(),
-  phone: z
-    .string()
-    .regex(/^[\d\s\-()]+$/, '올바른 전화번호 형식이 아닙니다')
-    .optional()
-    .or(z.literal(''))
-    .nullable(),
+  email: z.union([
+    z.string().email('올바른 이메일 형식이 아닙니다'),
+    z.literal(''),
+    z.null(),
+  ]).optional(),
+  phone: z.union([
+    z.string().regex(/^[\d\s\-()]+$/, '올바른 전화번호 형식이 아닙니다'),
+    z.literal(''),
+    z.null(),
+  ]).optional(),
   position: z.string().optional().nullable(),
-  companyId: z.string().uuid('올바른 UUID 형식이 아닙니다').optional().nullable(),
+  companyId: z.string().uuid().optional().or(z.literal('')).nullable(),
   memo: z.string().optional().nullable(),
 });
 
@@ -51,9 +53,9 @@ export const dealSchema = z.object({
   title: z.string().min(1, '거래명은 필수입니다'),
   amount: z.number().int().min(0, '금액은 0 이상이어야 합니다').default(0),
   stage: z.enum(dealStages).default('lead'),
-  expectedCloseDate: z.string().datetime().optional().nullable(),
-  contactId: z.string().uuid().optional().nullable(),
-  companyId: z.string().uuid().optional().nullable(),
+  expectedCloseDate: z.string().optional().or(z.literal('')).nullable(),
+  contactId: z.string().uuid().optional().or(z.literal('')).nullable(),
+  companyId: z.string().uuid().optional().or(z.literal('')).nullable(),
   memo: z.string().optional().nullable(),
 });
 
