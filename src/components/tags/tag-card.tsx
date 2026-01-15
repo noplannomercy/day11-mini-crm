@@ -5,9 +5,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, Tag as TagIcon } from 'lucide-react';
 
+type TagBasic = Pick<Tag, 'id' | 'name' | 'color'>;
+
 type Props = {
-  tag: Tag;
-  onEdit: (tag: Tag) => void;
+  tag: TagBasic;
+  onEdit: (tag: TagBasic) => void;
   onDelete: (id: string) => void;
 };
 

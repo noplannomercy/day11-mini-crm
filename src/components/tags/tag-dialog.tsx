@@ -13,11 +13,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+type TagBasic = Pick<Tag, 'id' | 'name' | 'color'>;
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tag: Tag | null;
-  onSave: (tag: Tag) => void;
+  tag: TagBasic | null;
+  onSave: (tag: TagBasic) => void;
 };
 
 const PRESET_COLORS = [

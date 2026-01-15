@@ -7,21 +7,23 @@ import { TagDialog } from './tag-dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
+type TagBasic = Pick<Tag, 'id' | 'name' | 'color'>;
+
 type Props = {
-  initialTags: Tag[];
+  initialTags: TagBasic[];
 };
 
 export function TagList({ initialTags }: Props) {
-  const [tags, setTags] = useState<Tag[]>(initialTags);
+  const [tags, setTags] = useState<TagBasic[]>(initialTags);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTag, setEditingTag] = useState<Tag | null>(null);
+  const [editingTag, setEditingTag] = useState<TagBasic | null>(null);
 
   const handleCreate = () => {
     setEditingTag(null);
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (tag: Tag) => {
+  const handleEdit = (tag: TagBasic) => {
     setEditingTag(tag);
     setIsDialogOpen(true);
   };
@@ -45,7 +47,7 @@ export function TagList({ initialTags }: Props) {
     }
   };
 
-  const handleSave = (tag: Tag) => {
+  const handleSave = (tag: TagBasic) => {
     if (editingTag) {
       setTags((prev) => prev.map((t) => (t.id === tag.id ? tag : t)));
     } else {

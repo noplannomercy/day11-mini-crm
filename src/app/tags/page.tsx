@@ -4,7 +4,11 @@ import { TagList } from '@/components/tags/tag-list';
 
 export default async function TagsPage() {
   const allTags = await db
-    .select()
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+    })
     .from(tags)
     .orderBy(tags.name);
 
