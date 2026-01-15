@@ -4,6 +4,8 @@ import { desc, and, gte, lt, isNull } from 'drizzle-orm';
 import { Dashboard } from '@/components/dashboard/dashboard';
 import { getStats } from '@/lib/stats';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   // Fetch stats directly
   const stats = await getStats();

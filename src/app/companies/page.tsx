@@ -3,6 +3,8 @@ import { companies, contacts } from '@/lib/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 import { CompanyList } from '@/components/companies/company-list';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CompaniesPage() {
   // Fetch companies with contact count
   const allCompanies = await db

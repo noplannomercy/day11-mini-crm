@@ -2,6 +2,8 @@ import { db } from '@/lib/db';
 import { tags } from '@/lib/db/schema';
 import { TagList } from '@/components/tags/tag-list';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TagsPage() {
   const allTags = await db
     .select({

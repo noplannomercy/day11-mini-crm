@@ -3,6 +3,8 @@ import { tasks, contacts, companies, deals } from '@/lib/db/schema';
 import { eq, sql, desc } from 'drizzle-orm';
 import { TaskList } from '@/components/tasks/task-list';
 
+export const dynamic = 'force-dynamic';
+
 export default async function TasksPage() {
   const allTasks = await db
     .select({

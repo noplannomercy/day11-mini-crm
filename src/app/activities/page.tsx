@@ -3,6 +3,8 @@ import { activities, contacts, companies, deals } from '@/lib/db/schema';
 import { eq, sql, desc } from 'drizzle-orm';
 import { ActivityList } from '@/components/activities/activity-list';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ActivitiesPage() {
   const allActivities = await db
     .select({

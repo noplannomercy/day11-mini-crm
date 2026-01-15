@@ -3,6 +3,8 @@ import { emailTemplates } from '@/lib/db/schema';
 import { desc } from 'drizzle-orm';
 import { EmailTemplateList } from '@/components/email-templates/email-template-list';
 
+export const dynamic = 'force-dynamic';
+
 export default async function EmailTemplatesPage() {
   const templates = await db
     .select()

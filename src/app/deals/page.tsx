@@ -2,6 +2,8 @@ import { db } from '@/lib/db';
 import { contacts, companies } from '@/lib/db/schema';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DealsPage() {
   // Fetch deals with relations using Drizzle query API
   const allDeals = await db.query.deals.findMany({
