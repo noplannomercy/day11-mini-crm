@@ -2,13 +2,11 @@ import { db } from '@/lib/db';
 import { activities } from '@/lib/db/schema';
 import { desc, and, gte, lt, isNull } from 'drizzle-orm';
 import { Dashboard } from '@/components/dashboard/dashboard';
+import { getStats } from '@/lib/stats';
 
 export default async function DashboardPage() {
-  // Fetch stats
-  const statsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/stats`, {
-    cache: 'no-store',
-  });
-  const stats = statsRes.ok ? await statsRes.json() : null;
+  // Fetch stats directly
+  const stats = await getStats();
 
   // Fetch recent activities (last 5)
   const recentActivities = await db
