@@ -1,32 +1,28 @@
 'use client';
 
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useDraggable } from '@dnd-kit/core';
 import { Deal } from '@/lib/db/schema';
 import { DealCard } from './deal-card';
 
 interface DraggableDealCardProps {
   deal: Deal;
-  disabled?: boolean;
 }
 
-export function DraggableDealCard({ deal, disabled }: DraggableDealCardProps) {
+export function DraggableDealCard({ deal }: DraggableDealCardProps) {
   const {
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
-  } = useSortable({
+  } = useDraggable({
     id: deal.id,
-    disabled,
+    data: {
+      deal,
+    },
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    visibility: isDragging ? ('hidden' as const) : undefined,
   };
 
   return (
@@ -36,7 +32,7 @@ export function DraggableDealCard({ deal, disabled }: DraggableDealCardProps) {
       {...attributes}
       {...listeners}
     >
-      <DealCard deal={deal} isDragging={isDragging} />
+      <DealCard deal={deal} isDragging={false} />
     </div>
   );
 }

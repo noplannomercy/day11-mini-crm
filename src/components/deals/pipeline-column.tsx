@@ -1,7 +1,6 @@
 'use client';
 
 import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Deal } from '@/lib/db/schema';
 import { formatCurrencyShort } from '@/lib/constants';
 import { DraggableDealCard } from './draggable-deal-card';
@@ -13,13 +12,14 @@ interface PipelineColumnProps {
     color: string;
   };
   deals: Deal[];
-  disabled?: boolean;
 }
 
-export function PipelineColumn({ stage, deals, disabled }: PipelineColumnProps) {
+export function PipelineColumn({ stage, deals }: PipelineColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
-    disabled,
+    data: {
+      stage: stage.id,
+    },
   });
 
   const total = deals.reduce((sum, deal) => sum + deal.amount, 0);
@@ -28,10 +28,9 @@ export function PipelineColumn({ stage, deals, disabled }: PipelineColumnProps) 
     <div
       ref={setNodeRef}
       data-testid={`column-${stage.id}`}
-      className={`
-        flex flex-col w-80 bg-gray-50 rounded-lg p-4
-        ${isOver ? 'ring-2 ring-blue-400' : ''}
-      `}
+      className={`flex flex-col w-80 bg-gray-50 rounded-lg p-4 ${
+        isOver ? 'ring-2 ring-blue-400' : ''
+      }`}
     >
       {/* Column Header */}
       <div className="mb-4">
@@ -49,21 +48,14 @@ export function PipelineColumn({ stage, deals, disabled }: PipelineColumnProps) 
       </div>
 
       {/* Deals List */}
-      <SortableContext
-        items={deals.map(d => d.id)}
-        strategy={verticalListSortingStrategy}
-        disabled={disabled}
-      >
-        <div className="flex-1 space-y-2 min-h-[200px]">
-          {deals.map(deal => (
-            <DraggableDealCard
-              key={deal.id}
-              deal={deal}
-              disabled={disabled}
-            />
-          ))}
-        </div>
-      </SortableContext>
+      <div className="flex-1 space-y-2 min-h-[200px]">
+        {deals.map(deal => (
+          <DraggableDealCard
+            key={deal.id}
+            deal={deal}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { DndContext, DragEndEvent, DragStartEvent, closestCenter, DragOverlay } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  pointerWithin,
+} from '@dnd-kit/core';
 import { Deal } from '@/lib/db/schema';
 import { DealStage } from '@/lib/validations';
 import { PIPELINE_STAGES } from '@/lib/constants';
@@ -10,18 +19,31 @@ import { DealCard } from './deal-card';
 import { DealDialog } from './deal-dialog';
 import { Button } from '@/components/ui/button';
 
+type DealWithRelations = Deal & {
+  contact: { id: string; name: string } | null;
+  company: { id: string; name: string } | null;
+};
+
 interface PipelineBoardProps {
-  initialDeals: Deal[];
+  initialDeals: DealWithRelations[];
   contacts: { id: string; name: string }[];
   companies: { id: string; name: string }[];
 }
 
 export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoardProps) {
-  const [deals, setDeals] = useState<Deal[]>(initialDeals);
+  const [deals, setDeals] = useState<DealWithRelations[]>(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [selectedDeal, setSelectedDeal] = useState<DealWithRelations | null>(null);
+
+  // Configure sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement required before drag starts
+      },
+    })
+  );
 
   // Group deals by stage
   const dealsByStage = PIPELINE_STAGES.reduce((acc, stage) => {
@@ -34,15 +56,15 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
-    setIsDragging(true);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    setIsDragging(false);
 
-    if (!over) return;
+    if (!over) {
+      return;
+    }
 
     const dealId = active.id as string;
     const newStage = over.id as string;
@@ -65,22 +87,26 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
     );
 
     try {
+      const payload = {
+        stage: newStage,
+        updatedAt: new Date(deal.updatedAt).toISOString(),
+      };
+
       // Update via API with optimistic locking
       const response = await fetch(`/api/deals/${dealId}/stage`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stage: newStage,
-          updatedAt: deal.updatedAt,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         if (response.status === 409) {
           alert('다른 사용자가 수정했습니다. 새로고침해주세요.');
           window.location.reload();
+          return;
         }
-        throw new Error('Failed to update deal stage');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to update deal stage');
       }
 
       const updated = await response.json();
@@ -102,12 +128,26 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
   };
 
   const handleSaveDeal = (savedDeal: Deal) => {
+    // Add contact and company info to match DealWithRelations type
+    const contact = savedDeal.contactId
+      ? contacts.find(c => c.id === savedDeal.contactId) || null
+      : null;
+    const company = savedDeal.companyId
+      ? companies.find(c => c.id === savedDeal.companyId) || null
+      : null;
+
+    const dealWithRelations: DealWithRelations = {
+      ...savedDeal,
+      contact,
+      company,
+    };
+
     if (selectedDeal) {
       // Update existing deal
-      setDeals(prev => prev.map(d => d.id === savedDeal.id ? savedDeal : d));
+      setDeals(prev => prev.map(d => d.id === savedDeal.id ? dealWithRelations : d));
     } else {
       // Add new deal
-      setDeals(prev => [savedDeal, ...prev]);
+      setDeals(prev => [dealWithRelations, ...prev]);
     }
     setDialogOpen(false);
     setSelectedDeal(null);
@@ -130,9 +170,10 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
       </div>
 
       <DndContext
+        sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        collisionDetection={closestCenter}
+        collisionDetection={pointerWithin}
       >
         <div data-testid="pipeline-board" className="flex gap-4 overflow-x-auto p-4">
           {PIPELINE_STAGES.map(stage => (
@@ -140,12 +181,11 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
               key={stage.id}
               stage={stage}
               deals={dealsByStage[stage.id] || []}
-              disabled={isDragging}
             />
           ))}
         </div>
 
-        <DragOverlay>
+        <DragOverlay style={{ pointerEvents: 'none' }}>
           {activeDeal ? (
             <DealCard deal={activeDeal} isDragging />
           ) : null}

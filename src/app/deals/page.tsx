@@ -1,10 +1,26 @@
 import { db } from '@/lib/db';
-import { deals, contacts, companies } from '@/lib/db/schema';
-import { desc } from 'drizzle-orm';
+import { contacts, companies } from '@/lib/db/schema';
 import { PipelineBoard } from '@/components/deals/pipeline-board';
 
 export default async function DealsPage() {
-  const allDeals = await db.select().from(deals).orderBy(desc(deals.createdAt));
+  // Fetch deals with relations using Drizzle query API
+  const allDeals = await db.query.deals.findMany({
+    with: {
+      contact: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+      company: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: (deals, { desc }) => [desc(deals.createdAt)],
+  });
 
   // Fetch all contacts for the dialog
   const allContacts = await db
