@@ -195,7 +195,7 @@ export function PipelineBoard({ initialDeals, contacts, companies }: PipelineBoa
       <DealDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        deal={selectedDeal}
+        deal={selectedDeal as DealWithRelations | null}
         onSave={handleSaveDeal}
         contacts={contacts}
         companies={companies}
