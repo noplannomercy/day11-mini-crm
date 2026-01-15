@@ -134,7 +134,7 @@ export const tags = pgTable('tags', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 50 }).notNull().unique(),
   color: varchar('color', { length: 7 }).notNull(), // Hex color: #RRGGBB
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   nameIdx: index('idx_tags_name').on(table.name),
 }));
